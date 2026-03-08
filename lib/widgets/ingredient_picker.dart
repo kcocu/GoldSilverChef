@@ -31,10 +31,13 @@ class _IngredientPickerState extends State<IngredientPicker> {
 
   // 캐시
   Set<String>? _unlockedCache;
-  Set<String>? _discoverableCache;
+  Set<String>? _relatedLockedCache;
   List<Ingredient>? _filteredCache;
   int? _lastTierFilter;
   String? _lastSearch;
+
+  // 호버(클릭) 상태
+  String? _hoveredIngredientId;
 
   @override
   void initState() {
@@ -62,30 +65,75 @@ class _IngredientPickerState extends State<IngredientPicker> {
     return ids;
   }
 
-  /// 다음에 발견 가능한 재료 ID 세트 (캐시)
-  Set<String> get _discoverableIds {
-    if (_discoverableCache != null) return _discoverableCache!;
-    _discoverableCache = widget.engine.findDiscoverableOutputs(_unlockedIds);
-    return _discoverableCache!;
+  /// 해금된 재료가 입력으로 사용되는 레시피의 결과물 중 미해금인 것들
+  /// (해금된 재료 하나라도 포함된 레시피의 출력)
+  Set<String> get _relatedLockedIds {
+    if (_relatedLockedCache != null) return _relatedLockedCache!;
+    final unlocked = _unlockedIds;
+    final related = <String>{};
+    for (final recipe in widget.engine.allRecipes) {
+      if (unlocked.contains(recipe.outputIngredientId)) continue;
+      // 입력 중 하나라도 해금된 재료가 있으면 표시
+      final hasUnlockedInput = recipe.inputs.any(
+        (input) => unlocked.contains(input.ingredientId),
+      );
+      if (hasUnlockedInput) {
+        related.add(recipe.outputIngredientId);
+      }
+    }
+    _relatedLockedCache = related;
+    return related;
   }
 
   bool _isUnlocked(String id) => _unlockedIds.contains(id);
 
   void _invalidateCache() {
     _unlockedCache = null;
-    _discoverableCache = null;
+    _relatedLockedCache = null;
     _filteredCache = null;
   }
 
   @override
   void didUpdateWidget(IngredientPicker oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // recipeBook 변경 시 캐시 무효화
     _invalidateCache();
   }
 
+  /// 특정 재료로 만들 수 있는 요리 목록 (해금/미해금 모두)
+  List<_RelatedRecipeInfo> _getRelatedRecipes(String ingredientId) {
+    final recipes = widget.engine.findRecipesContaining(ingredientId);
+    final unlocked = _unlockedIds;
+    final result = <_RelatedRecipeInfo>[];
+    for (final recipe in recipes) {
+      final outputIng = widget.engine.getIngredient(recipe.outputIngredientId);
+      final isDiscovered = widget.recipeBook.isDiscovered(recipe.id);
+      final allInputsKnown = recipe.inputs.every(
+        (i) => unlocked.contains(i.ingredientId),
+      );
+      result.add(_RelatedRecipeInfo(
+        recipe: recipe,
+        outputName: isDiscovered ? (outputIng?.name ?? recipe.name) : '???',
+        isDiscovered: isDiscovered,
+        canMake: allInputsKnown,
+        inputNames: recipe.inputs.map((i) {
+          final ing = widget.engine.getIngredient(i.ingredientId);
+          final known = unlocked.contains(i.ingredientId);
+          return known ? (ing?.name ?? '?') : '???';
+        }).toList(),
+      ));
+    }
+    // 발견된 것 먼저, 만들 수 있는 것 먼저
+    result.sort((a, b) {
+      if (a.isDiscovered && !b.isDiscovered) return -1;
+      if (!a.isDiscovered && b.isDiscovered) return 1;
+      if (a.canMake && !b.canMake) return -1;
+      if (!a.canMake && b.canMake) return 1;
+      return 0;
+    });
+    return result.take(20).toList(); // 최대 20개
+  }
+
   List<Ingredient> _getFilteredIngredients() {
-    // 캐시 히트 체크
     if (_filteredCache != null &&
         _lastTierFilter == _tierFilter &&
         _lastSearch == _search) {
@@ -93,26 +141,23 @@ class _IngredientPickerState extends State<IngredientPicker> {
     }
 
     final unlocked = _unlockedIds;
-    final discoverable = _discoverableIds;
+    final relatedLocked = _relatedLockedIds;
 
     List<Ingredient> ingredients;
 
     if (widget.isRandom) {
-      // 랜덤 모드: 해금된 것만
       ingredients = _randomized.where((i) => unlocked.contains(i.id)).toList();
     } else if (_tierFilter == 0) {
-      // 기본 재료만
       ingredients = widget.engine.baseIngredients;
     } else if (_tierFilter == 1) {
-      // 파생 탭: 해금된 파생 + 발견 가능한 파생(???)
+      // 파생: 해금된 파생 + 관련 미해금
       final result = <Ingredient>[];
       for (final ing in widget.engine.allIngredients) {
         if (ing.isBase) continue;
-        if (unlocked.contains(ing.id) || discoverable.contains(ing.id)) {
+        if (unlocked.contains(ing.id) || relatedLocked.contains(ing.id)) {
           result.add(ing);
         }
       }
-      // 해금된 것 먼저
       result.sort((a, b) {
         final aUn = unlocked.contains(a.id);
         final bUn = unlocked.contains(b.id);
@@ -122,14 +167,13 @@ class _IngredientPickerState extends State<IngredientPicker> {
       });
       ingredients = result;
     } else {
-      // 전체: 기본 + 해금된 파생 + 발견 가능한 파생
+      // 전체: 기본 + 해금된 파생 + 관련 미해금
       final result = <Ingredient>[];
       for (final ing in widget.engine.allIngredients) {
-        if (ing.isBase || unlocked.contains(ing.id) || discoverable.contains(ing.id)) {
+        if (ing.isBase || unlocked.contains(ing.id) || relatedLocked.contains(ing.id)) {
           result.add(ing);
         }
       }
-      // 기본 먼저, 해금 먼저
       result.sort((a, b) {
         if (a.isBase && !b.isBase) return -1;
         if (!a.isBase && b.isBase) return 1;
@@ -142,11 +186,9 @@ class _IngredientPickerState extends State<IngredientPicker> {
       ingredients = result;
     }
 
-    // 검색 필터
     if (_search.isNotEmpty) {
       final query = _search.toLowerCase();
       ingredients = ingredients.where((i) {
-        // 해금된 것만 이름 검색 가능
         if (!unlocked.contains(i.id)) return false;
         return i.name.toLowerCase().contains(query);
       }).toList();
@@ -163,7 +205,7 @@ class _IngredientPickerState extends State<IngredientPicker> {
     final ingredients = _getFilteredIngredients();
     final unlocked = _unlockedIds;
     final totalUnlocked = unlocked.length;
-    final totalDiscoverable = _discoverableIds.length;
+    final totalRelated = _relatedLockedIds.length;
 
     return Column(
       children: [
@@ -199,6 +241,7 @@ class _IngredientPickerState extends State<IngredientPicker> {
                   setState(() {
                     _tierFilter = v.first;
                     _filteredCache = null;
+                    _hoveredIngredientId = null;
                   });
                 },
                 style: const ButtonStyle(
@@ -213,40 +256,169 @@ class _IngredientPickerState extends State<IngredientPicker> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
-            '해금 $totalUnlocked개 | 발견 가능 $totalDiscoverable개',
+            '해금 $totalUnlocked개 | 발견 가능 $totalRelated개',
             style: const TextStyle(fontSize: 11, color: Colors.grey),
           ),
         ),
 
+        // 호버된 재료의 관련 레시피 패널
+        if (_hoveredIngredientId != null) _buildRelatedPanel(),
+
         // 재료 그리드
         Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.all(8),
-            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-              maxCrossAxisExtent: 100,
-              childAspectRatio: 0.85,
-              crossAxisSpacing: 6,
-              mainAxisSpacing: 6,
-            ),
-            itemCount: ingredients.length,
-            itemBuilder: (context, index) {
-              final ing = ingredients[index];
-              final isUnlocked = unlocked.contains(ing.id);
-              return _IngredientTile(
-                ingredient: ing,
-                unlocked: isUnlocked,
-                onTap: () {
-                  if (isUnlocked) {
-                    widget.onSelect(ing.id);
-                  } else {
-                    _showHint(context, ing);
-                  }
-                },
-              );
+          child: GestureDetector(
+            onTap: () {
+              // 빈 공간 탭하면 호버 해제
+              if (_hoveredIngredientId != null) {
+                setState(() => _hoveredIngredientId = null);
+              }
             },
+            child: GridView.builder(
+              padding: const EdgeInsets.all(8),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 100,
+                childAspectRatio: 0.85,
+                crossAxisSpacing: 6,
+                mainAxisSpacing: 6,
+              ),
+              itemCount: ingredients.length,
+              itemBuilder: (context, index) {
+                final ing = ingredients[index];
+                final isUnlocked = unlocked.contains(ing.id);
+                final isHovered = _hoveredIngredientId == ing.id;
+                return _IngredientTile(
+                  ingredient: ing,
+                  unlocked: isUnlocked,
+                  isHovered: isHovered,
+                  onTap: () {
+                    if (isUnlocked) {
+                      // 해금된 재료: 탭 → 호버(관련 레시피 표시)
+                      setState(() {
+                        _hoveredIngredientId = _hoveredIngredientId == ing.id ? null : ing.id;
+                      });
+                    } else {
+                      // 미해금: 힌트
+                      _showHint(context, ing);
+                    }
+                  },
+                  onDoubleTap: isUnlocked ? () {
+                    // 더블탭 → 재료 선택
+                    setState(() => _hoveredIngredientId = null);
+                    widget.onSelect(ing.id);
+                  } : null,
+                );
+              },
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  /// 호버된 재료의 관련 레시피 패널
+  Widget _buildRelatedPanel() {
+    final ing = widget.engine.getIngredient(_hoveredIngredientId!);
+    if (ing == null) return const SizedBox.shrink();
+
+    final related = _getRelatedRecipes(ing.id);
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 160),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3F2FD),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 헤더
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(7),
+                topRight: Radius.circular(7),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(ing.icon, style: const TextStyle(fontSize: 18)),
+                const SizedBox(width: 6),
+                Text(
+                  '${ing.name} (으)로 만들 수 있는 요리',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                // 선택 버튼
+                GestureDetector(
+                  onTap: () {
+                    setState(() => _hoveredIngredientId = null);
+                    widget.onSelect(ing.id);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2E7D32),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text('선택', style: TextStyle(fontSize: 11, color: Colors.white)),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: () => setState(() => _hoveredIngredientId = null),
+                  child: const Icon(Icons.close, size: 16),
+                ),
+              ],
+            ),
+          ),
+          // 레시피 목록
+          Flexible(
+            child: related.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(12),
+                    child: Text('아직 관련 레시피가 없습니다.', style: TextStyle(color: Colors.grey)),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    itemCount: related.length,
+                    itemBuilder: (context, index) {
+                      final info = related[index];
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          children: [
+                            Icon(
+                              info.isDiscovered ? Icons.check_circle : Icons.help_outline,
+                              size: 14,
+                              color: info.isDiscovered
+                                  ? Colors.green
+                                  : info.canMake ? Colors.orange : Colors.grey,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                '${info.inputNames.join(" + ")} → ${info.outputName}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: info.isDiscovered ? Colors.black87 : Colors.grey.shade700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -304,32 +476,59 @@ class _IngredientPickerState extends State<IngredientPicker> {
   }
 }
 
+class _RelatedRecipeInfo {
+  final Recipe recipe;
+  final String outputName;
+  final bool isDiscovered;
+  final bool canMake;
+  final List<String> inputNames;
+
+  const _RelatedRecipeInfo({
+    required this.recipe,
+    required this.outputName,
+    required this.isDiscovered,
+    required this.canMake,
+    required this.inputNames,
+  });
+}
+
 class _IngredientTile extends StatelessWidget {
   final Ingredient ingredient;
   final bool unlocked;
+  final bool isHovered;
   final VoidCallback onTap;
+  final VoidCallback? onDoubleTap;
 
   const _IngredientTile({
     required this.ingredient,
     required this.unlocked,
+    this.isHovered = false,
     required this.onTap,
+    this.onDoubleTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      onDoubleTap: onDoubleTap,
       child: Container(
         decoration: BoxDecoration(
           color: !unlocked
               ? Colors.grey.shade200
-              : ingredient.isBase
-                  ? const Color(0xFFE8F5E9)
-                  : Colors.white,
+              : isHovered
+                  ? Colors.blue.shade50
+                  : ingredient.isBase
+                      ? const Color(0xFFE8F5E9)
+                      : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: !unlocked ? Colors.grey.shade400 : Colors.grey.shade300,
+            color: isHovered
+                ? Colors.blue.shade400
+                : !unlocked
+                    ? Colors.grey.shade400
+                    : Colors.grey.shade300,
+            width: isHovered ? 2 : 1,
           ),
         ),
         child: Stack(

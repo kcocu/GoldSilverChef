@@ -43,7 +43,10 @@ class _CookingScreenState extends State<CookingScreen> {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<GameState>();
-    final title = widget.isRandom ? '랜덤 모드' : (widget.requiredTheme != null ? '주제: ${widget.requiredTheme}' : '자유 경연');
+    final themeName = widget.requiredTheme != null
+        ? (state.engine.getIngredient(widget.requiredTheme!)?.name ?? widget.requiredTheme!)
+        : null;
+    final title = widget.isRandom ? '랜덤 모드' : (themeName != null ? '주제: $themeName' : '자유 경연');
     final hasIngredients = state.selectedIngredients.isNotEmpty;
     final hasResult = state.lastResult != null;
     final isFailed = hasResult && state.lastResult!.recipeId == 'failed';
