@@ -266,49 +266,40 @@ class _IngredientPickerState extends State<IngredientPicker> {
 
         // 재료 그리드
         Expanded(
-          child: GestureDetector(
-            onTap: () {
-              // 빈 공간 탭하면 호버 해제
-              if (_hoveredIngredientId != null) {
-                setState(() => _hoveredIngredientId = null);
-              }
-            },
-            child: GridView.builder(
-              padding: const EdgeInsets.all(8),
-              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                maxCrossAxisExtent: 100,
-                childAspectRatio: 0.85,
-                crossAxisSpacing: 6,
-                mainAxisSpacing: 6,
-              ),
-              itemCount: ingredients.length,
-              itemBuilder: (context, index) {
-                final ing = ingredients[index];
-                final isUnlocked = unlocked.contains(ing.id);
-                final isHovered = _hoveredIngredientId == ing.id;
-                return _IngredientTile(
-                  ingredient: ing,
-                  unlocked: isUnlocked,
-                  isHovered: isHovered,
-                  onTap: () {
-                    if (isUnlocked) {
-                      // 해금된 재료: 탭 → 호버(관련 레시피 표시)
-                      setState(() {
-                        _hoveredIngredientId = _hoveredIngredientId == ing.id ? null : ing.id;
-                      });
-                    } else {
-                      // 미해금: 힌트
-                      _showHint(context, ing);
-                    }
-                  },
-                  onDoubleTap: isUnlocked ? () {
-                    // 더블탭 → 재료 선택
-                    setState(() => _hoveredIngredientId = null);
-                    widget.onSelect(ing.id);
-                  } : null,
-                );
-              },
+          child: GridView.builder(
+            padding: const EdgeInsets.all(8),
+            gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+              maxCrossAxisExtent: 100,
+              childAspectRatio: 0.85,
+              crossAxisSpacing: 6,
+              mainAxisSpacing: 6,
             ),
+            itemCount: ingredients.length,
+            itemBuilder: (context, index) {
+              final ing = ingredients[index];
+              final isUnlocked = unlocked.contains(ing.id);
+              final isHovered = _hoveredIngredientId == ing.id;
+              return _IngredientTile(
+                ingredient: ing,
+                unlocked: isUnlocked,
+                isHovered: isHovered,
+                onTap: () {
+                  if (isUnlocked) {
+                    if (_hoveredIngredientId == ing.id) {
+                      // 이미 호버 중이면 → 재료 선택
+                      setState(() => _hoveredIngredientId = null);
+                      widget.onSelect(ing.id);
+                    } else {
+                      // 첫 탭 → 호버(관련 레시피 표시)
+                      setState(() => _hoveredIngredientId = ing.id);
+                    }
+                  } else {
+                    // 미해금: 힌트
+                    _showHint(context, ing);
+                  }
+                },
+              );
+            },
           ),
         ),
       ],
@@ -497,21 +488,19 @@ class _IngredientTile extends StatelessWidget {
   final bool unlocked;
   final bool isHovered;
   final VoidCallback onTap;
-  final VoidCallback? onDoubleTap;
 
   const _IngredientTile({
     required this.ingredient,
     required this.unlocked,
     this.isHovered = false,
     required this.onTap,
-    this.onDoubleTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      onDoubleTap: onDoubleTap,
+      borderRadius: BorderRadius.circular(8),
       child: Container(
         decoration: BoxDecoration(
           color: !unlocked
