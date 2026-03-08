@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
+import '../services/audio_service.dart';
 import '../services/game_state.dart';
 import '../widgets/ingredient_picker.dart';
 import '../widgets/cooking_tools.dart';
@@ -25,10 +26,18 @@ class CookingScreen extends StatefulWidget {
 class _CookingScreenState extends State<CookingScreen> {
   Timer? _cookingTimer;
   bool _isCooking = false;
+  final _audio = AudioService.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _audio.playCookingBgm();
+  }
 
   @override
   void dispose() {
     _cookingTimer?.cancel();
+    _audio.playMenuBgm();
     super.dispose();
   }
 
@@ -69,9 +78,9 @@ class _CookingScreenState extends State<CookingScreen> {
               fireLevel: state.fireLevel,
               isCooking: _isCooking,
               cookingTime: state.cookingTime,
-              onChop: () => state.chop(),
+              onChop: () { state.chop(); _audio.playChop(); },
               onWaterChange: (v) => state.setWaterAmount(v),
-              onFireChange: (v) => state.setFireLevel(v),
+              onFireChange: (v) { state.setFireLevel(v); _audio.playFire(); },
               onStartCooking: _startCooking,
               onStopCooking: _stopCooking,
             ),
@@ -226,6 +235,10 @@ class _CookingScreenState extends State<CookingScreen> {
   void _tryCook(GameState state) {
     _stopCooking();
     final result = state.cook();
+    if (result != null) {
+      _audio.playBell();
+      _audio.playCookware();
+    }
     if (result == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('이 조합으로는 만들 수 있는 요리가 없습니다!')),

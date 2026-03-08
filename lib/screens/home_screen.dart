@@ -1,10 +1,22 @@
 import 'package:flutter/material.dart';
+import '../services/audio_service.dart';
 import 'cooking_screen.dart';
 import 'recipe_book_screen.dart';
 import 'story_mode_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    AudioService.instance.playMenuBgm();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,6 +96,39 @@ class HomeScreen extends StatelessWidget {
                       context,
                       MaterialPageRoute(builder: (_) => const RecipeBookScreen()),
                     ),
+                  ),
+                  const SizedBox(height: 32),
+                  // 사운드 토글
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          AudioService.instance.bgmEnabled
+                              ? Icons.music_note
+                              : Icons.music_off,
+                          color: const Color(0xFF5D4037),
+                        ),
+                        onPressed: () {
+                          setState(() => AudioService.instance.toggleBgm());
+                          if (AudioService.instance.bgmEnabled) {
+                            AudioService.instance.playMenuBgm();
+                          }
+                        },
+                        tooltip: 'BGM',
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
+                        icon: Icon(
+                          AudioService.instance.sfxEnabled
+                              ? Icons.volume_up
+                              : Icons.volume_off,
+                          color: const Color(0xFF5D4037),
+                        ),
+                        onPressed: () => setState(() => AudioService.instance.toggleSfx()),
+                        tooltip: '효과음',
+                      ),
+                    ],
                   ),
                 ],
               ),
