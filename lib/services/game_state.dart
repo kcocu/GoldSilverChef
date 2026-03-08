@@ -91,10 +91,29 @@ class GameState extends ChangeNotifier {
     return recipes.isNotEmpty ? recipes.first : null;
   }
 
-  /// 조리 완료 → 결과 계산
-  CookingResult? cook() {
+  /// 조리 완료 → 결과 계산 (실패 시에도 결과 반환)
+  CookingResult cook() {
     final recipe = findMatchingRecipe();
-    if (recipe == null) return null;
+
+    if (recipe == null) {
+      // 실패 결과 생성
+      final failedResult = CookingResult(
+        recipeId: 'failed',
+        recipeName: '실패한 요리',
+        grade: QualityGrade.F,
+        knifeValue: _knifeCount,
+        waterValue: _waterAmount.round(),
+        fireValue: (_fireLevel * _cookingTime).round(),
+        knifeAccuracy: 0,
+        waterAccuracy: 0,
+        fireAccuracy: 0,
+        overallAccuracy: 0,
+        intermediateResults: _intermediateResults,
+      );
+      _lastResult = failedResult;
+      notifyListeners();
+      return failedResult;
+    }
 
     final fireValue = (_fireLevel * _cookingTime).round();
     final result = QualityCalculator.calculate(
@@ -108,7 +127,7 @@ class GameState extends ChangeNotifier {
     _lastResult = result;
 
     // 레시피북에 등록
-    final isNew = recipeBook.discover(recipe.id);
+    recipeBook.discover(recipe.id);
 
     notifyListeners();
     return result;

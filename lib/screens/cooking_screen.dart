@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/models.dart';
 import '../services/audio_service.dart';
 import '../services/game_state.dart';
 import '../widgets/ingredient_picker.dart';
@@ -45,6 +44,9 @@ class _CookingScreenState extends State<CookingScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<GameState>();
     final title = widget.isRandom ? '랜덤 모드' : (widget.requiredTheme != null ? '주제: ${widget.requiredTheme}' : '자유 경연');
+    final hasIngredients = state.selectedIngredients.isNotEmpty;
+    final hasResult = state.lastResult != null;
+    final isFailed = hasResult && state.lastResult!.recipeId == 'failed';
 
     return Scaffold(
       appBar: AppBar(
@@ -71,7 +73,7 @@ class _CookingScreenState extends State<CookingScreen> {
 
             const Divider(height: 1),
 
-            // 조리 도구
+            // 조리 도구 + 조리하기 버튼
             CookingTools(
               knifeCount: state.knifeCount,
               waterAmount: state.waterAmount,
@@ -83,33 +85,46 @@ class _CookingScreenState extends State<CookingScreen> {
               onFireChange: (v) { state.setFireLevel(v); _audio.playFire(); },
               onStartCooking: _startCooking,
               onStopCooking: _stopCooking,
+              onCook: hasIngredients && !hasResult ? () => _tryCook(state) : null,
             ),
 
             const Divider(height: 1),
 
             // 결과 또는 재료 선택
             Expanded(
-              child: state.lastResult != null
-                  ? _buildResultArea(state)
+              child: hasResult
+                  ? _buildResultArea(state, isFailed)
                   : IngredientPicker(
                       engine: state.engine,
+                      recipeBook: state.recipeBook,
                       onSelect: (id) => state.addIngredient(id),
                       isRandom: widget.isRandom,
                     ),
             ),
+
+            // 하단 제출하기 버튼
+            if (hasResult && !isFailed)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                color: const Color(0xFFFFF3E0),
+                child: ElevatedButton.icon(
+                  onPressed: () => _submitForJudging(state),
+                  icon: const Icon(Icons.gavel, size: 22),
+                  label: const Text('제출하기', style: TextStyle(fontSize: 18)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFE65100),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
-      // 조합 버튼
-      floatingActionButton: state.lastResult == null && state.selectedIngredients.isNotEmpty
-          ? FloatingActionButton.extended(
-              onPressed: () => _tryCook(state),
-              icon: const Icon(Icons.local_fire_department),
-              label: const Text('조리하기'),
-              backgroundColor: const Color(0xFFE65100),
-              foregroundColor: Colors.white,
-            )
-          : null,
     );
   }
 
@@ -126,7 +141,7 @@ class _CookingScreenState extends State<CookingScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('💡 조합 힌트:', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text('조합 힌트:', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           ...chain.map((r) {
             final inputs = r.inputs.map((i) {
@@ -171,55 +186,80 @@ class _CookingScreenState extends State<CookingScreen> {
     );
   }
 
-  Widget _buildResultArea(GameState state) {
+  Widget _buildResultArea(GameState state, bool isFailed) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          CookingResultCard(result: state.lastResult!),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => state.useResultAsIngredient(),
-                  icon: const Icon(Icons.add_circle_outline),
-                  label: const Text('재료로 사용'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2E7D32),
-                    foregroundColor: Colors.white,
-                  ),
+          if (isFailed) _buildFailedResult(state)
+          else ...[
+            CookingResultCard(result: state.lastResult!),
+            const SizedBox(height: 16),
+            // 재료로 사용 버튼
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () => state.useResultAsIngredient(),
+                icon: const Icon(Icons.add_circle_outline),
+                label: const Text('이 결과물을 재료로 사용하여 추가 조합'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF2E7D32),
+                  side: const BorderSide(color: Color(0xFF2E7D32)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    state.requestJudging();
-                    if (state.lastJudging != null) {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => JudgingScreen(result: state.lastJudging!),
-                        ),
-                      );
-                      // 스토리 모드에서 온 경우, 심사 결과를 반환
-                      if (context.mounted && widget.requiredTheme != null) {
-                        Navigator.pop(context, state.lastJudging);
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.gavel),
-                  label: const Text('심사 받기'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE65100),
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildFailedResult(GameState state) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: Colors.grey.shade100,
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            const Text('💨', style: TextStyle(fontSize: 50)),
+            const SizedBox(height: 12),
+            const Text(
+              '실패한 요리',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.grey,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Text(
+                '품질 F',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              '이 재료 조합으로는 만들 수 있는 요리가 없습니다.\n다른 재료 조합을 시도해보세요!',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: () => state.resetCooking(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('다시 시도'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF5D4037),
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -239,23 +279,34 @@ class _CookingScreenState extends State<CookingScreen> {
   void _tryCook(GameState state) {
     _stopCooking();
     final result = state.cook();
-    if (result != null) {
+    final isFailed = result.recipeId == 'failed';
+    if (!isFailed) {
       _audio.playBell();
       _audio.playCookware();
-    }
-    if (result == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('이 조합으로는 만들 수 있는 요리가 없습니다!')),
-      );
-    } else {
       final isNew = state.recipeBook.isDiscovered(result.recipeId);
       if (isNew) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('🎉 새 요리 발견! ${result.recipeName}'),
+            content: Text('새 요리 발견! ${result.recipeName}'),
             backgroundColor: const Color(0xFF2E7D32),
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _submitForJudging(GameState state) async {
+    state.requestJudging();
+    if (state.lastJudging != null) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => JudgingScreen(result: state.lastJudging!),
+        ),
+      );
+      // 스토리 모드에서 온 경우, 심사 결과를 반환
+      if (context.mounted && widget.requiredTheme != null) {
+        Navigator.pop(context, state.lastJudging);
       }
     }
   }

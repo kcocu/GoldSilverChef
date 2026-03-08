@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/game_state.dart';
 
-/// 조리 도구 패널 — 칼, 물, 불 조작
+/// 조리 도구 패널 — 칼, 물, 불 조작 + 조리하기 버튼
 class CookingTools extends StatefulWidget {
   final int knifeCount;
   final double waterAmount;
@@ -14,6 +14,7 @@ class CookingTools extends StatefulWidget {
   final Function(int) onFireChange;
   final Function(GameState) onStartCooking;
   final VoidCallback onStopCooking;
+  final VoidCallback? onCook; // 조리하기 버튼
 
   const CookingTools({
     super.key,
@@ -27,6 +28,7 @@ class CookingTools extends StatefulWidget {
     required this.onFireChange,
     required this.onStartCooking,
     required this.onStopCooking,
+    this.onCook,
   });
 
   @override
@@ -34,9 +36,6 @@ class CookingTools extends StatefulWidget {
 }
 
 class _CookingToolsState extends State<CookingTools> {
-  // 물 드래그 상태
-  double _waterDragAngle = 0;
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -60,6 +59,26 @@ class _CookingToolsState extends State<CookingTools> {
             const SizedBox(height: 8),
             _buildCookingControl(),
           ],
+          // 조리하기 버튼
+          if (widget.onCook != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: widget.onCook,
+                icon: const Icon(Icons.local_fire_department),
+                label: const Text('조리하기', style: TextStyle(fontSize: 16)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -70,7 +89,6 @@ class _CookingToolsState extends State<CookingTools> {
       children: [
         const Text('🔪 칼', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         const SizedBox(height: 4),
-        // 터치/클릭으로 칼질
         GestureDetector(
           onTap: widget.onChop,
           child: Container(
@@ -100,39 +118,71 @@ class _CookingToolsState extends State<CookingTools> {
       children: [
         const Text('💧 물', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         const SizedBox(height: 4),
-        // 드래그해서 기울이기
-        GestureDetector(
-          onPanUpdate: (details) {
-            setState(() {
-              _waterDragAngle += details.delta.dy * -0.5;
-              _waterDragAngle = _waterDragAngle.clamp(-50, 0);
-              // 기울기에 따라 물 양 증가
-              final pourRate = (_waterDragAngle.abs() / 50) * 2;
-              widget.onWaterChange(widget.waterAmount + pourRate);
-            });
-          },
-          onPanEnd: (_) => setState(() => _waterDragAngle = 0),
-          child: Transform.rotate(
-            angle: _waterDragAngle * 0.01,
-            child: Container(
-              width: 70,
-              height: 50,
+        // 슬라이더 + 버튼으로 물 조절
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: () => widget.onWaterChange((widget.waterAmount - 5).clamp(0, 100)),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Center(child: Text('-', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Container(
+              width: 36,
+              height: 40,
               decoration: BoxDecoration(
                 color: Colors.blue.shade200,
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: const [BoxShadow(blurRadius: 2, color: Colors.black26)],
+                borderRadius: BorderRadius.circular(6),
               ),
               child: Center(
                 child: Text(
                   '${widget.waterAmount.round()}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
               ),
             ),
+            const SizedBox(width: 4),
+            GestureDetector(
+              onTap: () => widget.onWaterChange((widget.waterAmount + 5).clamp(0, 100)),
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Center(child: Text('+', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(
+          width: 90,
+          child: SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 4,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              activeTrackColor: Colors.blue.shade400,
+              inactiveTrackColor: Colors.blue.shade100,
+              thumbColor: Colors.blue.shade600,
+            ),
+            child: Slider(
+              value: widget.waterAmount,
+              min: 0,
+              max: 100,
+              onChanged: (v) => widget.onWaterChange(v),
+            ),
           ),
         ),
-        const SizedBox(height: 2),
-        const Text('드래그해서 붓기', style: TextStyle(fontSize: 10, color: Colors.grey)),
       ],
     );
   }
