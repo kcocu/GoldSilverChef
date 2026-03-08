@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/crafting_engine.dart';
+import '../services/ingredient_image_map.dart';
 
 class IngredientPicker extends StatefulWidget {
   final CraftingEngine engine;
@@ -147,7 +148,7 @@ class _IngredientTile extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(ingredient.icon, style: const TextStyle(fontSize: 28)),
+            _buildIcon(),
             const SizedBox(height: 4),
             Text(
               ingredient.name,
@@ -160,5 +161,19 @@ class _IngredientTile extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Widget _buildIcon() {
+    final imagePath = IngredientImageMap.getImagePath(ingredient.id);
+    if (imagePath != null) {
+      return Image.asset(
+        imagePath,
+        width: 32,
+        height: 32,
+        errorBuilder: (_, __, ___) =>
+            Text(ingredient.icon, style: const TextStyle(fontSize: 28)),
+      );
+    }
+    return Text(ingredient.icon, style: const TextStyle(fontSize: 28));
   }
 }

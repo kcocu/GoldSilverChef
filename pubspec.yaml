@@ -60,7 +60,20 @@ flutter:
   assets:
     - assets/data/recipes.json
     - assets/sounds/
-    - assets/images/ingredients/
+    - assets/images/ingredients/condiment/
+    - assets/images/ingredients/dairy/
+    - assets/images/ingredients/dessert/
+    - assets/images/ingredients/drink/
+    - assets/images/ingredients/fruit/
+    - assets/images/ingredients/grain/
+    - assets/images/ingredients/herb/
+    - assets/images/ingredients/meat/
+    - assets/images/ingredients/misc/
+    - assets/images/ingredients/pasta/
+    - assets/images/ingredients/seed/
+    - assets/images/ingredients/spice/
+    - assets/images/ingredients/treat/
+    - assets/images/ingredients/vegetable/
     - assets/images/ui/
 
   # An image asset can refer to one or more resolution-specific "variants", see
