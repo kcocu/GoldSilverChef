@@ -5,6 +5,7 @@ import 'quality_calculator.dart';
 import 'judging_engine.dart';
 import 'recipe_book.dart';
 import 'leaderboard.dart';
+import 'procedural_recipe.dart';
 
 /// 게임 전체 상태 관리
 class GameState extends ChangeNotifier {
@@ -23,6 +24,7 @@ class GameState extends ChangeNotifier {
   double _cookingTime = 0;
   CookingResult? _lastResult;
   JudgingResult? _lastJudging;
+  bool _isProcedural = false; // 마지막 결과가 절차적 생성인지
 
   // 연쇄 조합용 중간 결과
   final List<CookingResult> _intermediateResults = [];
@@ -34,6 +36,7 @@ class GameState extends ChangeNotifier {
   double get cookingTime => _cookingTime;
   CookingResult? get lastResult => _lastResult;
   JudgingResult? get lastJudging => _lastJudging;
+  bool get isProcedural => _isProcedural;
   List<CookingResult> get intermediateResults => List.unmodifiable(_intermediateResults);
 
   void markLoaded() {
@@ -84,72 +87,171 @@ class GameState extends ChangeNotifier {
 
   // ─── 조리 실행 ───
 
-  /// 현재 재료로 조합 시도
+  /// 현재 재료로 정적 레시피 매칭
   Recipe? findMatchingRecipe() {
     if (_selectedIngredients.isEmpty) return null;
     final recipes = engine.findRecipes(_selectedIngredients);
     return recipes.isNotEmpty ? recipes.first : null;
   }
 
-  /// 조리 완료 → 결과 계산 (실패 시에도 결과 반환)
+  /// 조리 완료 → 정적 레시피 우선, 없으면 절차적 생성
   CookingResult cook() {
     final recipe = findMatchingRecipe();
+    final fireValue = (_fireLevel * _cookingTime).round();
 
-    if (recipe == null) {
-      // 실패 결과 생성
+    if (recipe != null) {
+      // 정적 레시피 매칭 성공
+      _isProcedural = false;
+      final result = QualityCalculator.calculate(
+        recipe: recipe,
+        knifeValue: _knifeCount,
+        waterValue: _waterAmount.round(),
+        fireValue: fireValue,
+        intermediateResults: _intermediateResults,
+      );
+      _lastResult = result;
+      recipeBook.discover(recipe.id);
+      notifyListeners();
+      return result;
+    }
+
+    // 절차적 생성
+    _isProcedural = true;
+    final ingredients = _selectedIngredients
+        .map((id) => engine.getIngredient(id))
+        .whereType<Ingredient>()
+        .toList();
+
+    if (ingredients.isEmpty) {
       final failedResult = CookingResult(
         recipeId: 'failed',
         recipeName: '실패한 요리',
         grade: QualityGrade.F,
-        knifeValue: _knifeCount,
-        waterValue: _waterAmount.round(),
-        fireValue: (_fireLevel * _cookingTime).round(),
-        knifeAccuracy: 0,
-        waterAccuracy: 0,
-        fireAccuracy: 0,
         overallAccuracy: 0,
-        intermediateResults: _intermediateResults,
       );
       _lastResult = failedResult;
       notifyListeners();
       return failedResult;
     }
 
-    final fireValue = (_fireLevel * _cookingTime).round();
-    final result = QualityCalculator.calculate(
-      recipe: recipe,
+    final proc = ProceduralRecipeEngine.generate(
+      ingredients: ingredients,
       knifeValue: _knifeCount,
       waterValue: _waterAmount.round(),
       fireValue: fireValue,
+    );
+
+    // 도구 정확도 계산
+    final knifeRange = proc.toolRanges['knife'];
+    final waterRange = proc.toolRanges['water'];
+    final fireRange = proc.toolRanges['fire'];
+
+    final knifeAcc = knifeRange?.accuracy(_knifeCount) ?? 1.0;
+    final waterAcc = waterRange?.accuracy(_waterAmount.round()) ?? 1.0;
+    final fireAcc = fireRange?.accuracy(fireValue) ?? 1.0;
+
+    // 도구 평균 정확도
+    double toolAcc = 0;
+    int toolCount = 0;
+    if (_knifeCount > 0 || knifeRange != null) { toolAcc += knifeAcc; toolCount++; }
+    if (_waterAmount > 0 || waterRange != null) { toolAcc += waterAcc; toolCount++; }
+    if (fireValue > 0 || fireRange != null) { toolAcc += fireAcc; toolCount++; }
+    final avgToolAcc = toolCount > 0 ? toolAcc / toolCount : 0.5;
+
+    // 궁합 보정 + 랜덤 보정
+    final sanityMult = ProceduralRecipeEngine.sanityMultiplier(proc.sanityScore);
+    final hash = proc.name.hashCode;
+    final randomMult = ProceduralRecipeEngine.randomBonus(hash);
+
+    // 최종 정확도
+    double overallAcc = (avgToolAcc * sanityMult * randomMult).clamp(0.0, 1.0);
+
+    // 중간 결과 반영
+    if (_intermediateResults.isNotEmpty) {
+      final avgIntermediate = _intermediateResults
+          .map((r) => r.overallAccuracy)
+          .reduce((a, b) => a + b) / _intermediateResults.length;
+      overallAcc = overallAcc * 0.7 + avgIntermediate * 0.3;
+    }
+
+    final grade = _accuracyToGrade(overallAcc);
+
+    final result = CookingResult(
+      recipeId: 'proc_${hash.abs()}',
+      recipeName: proc.name,
+      grade: grade,
+      knifeValue: _knifeCount,
+      waterValue: _waterAmount.round(),
+      fireValue: fireValue,
+      knifeAccuracy: knifeAcc,
+      waterAccuracy: waterAcc,
+      fireAccuracy: fireAcc,
+      overallAccuracy: overallAcc,
       intermediateResults: _intermediateResults,
     );
 
     _lastResult = result;
-
-    // 레시피북에 등록
-    recipeBook.discover(recipe.id);
-
     notifyListeners();
     return result;
+  }
+
+  static QualityGrade _accuracyToGrade(double accuracy) {
+    if (accuracy >= 0.98) return QualityGrade.SSPlus;
+    if (accuracy >= 0.93) return QualityGrade.SS;
+    if (accuracy >= 0.85) return QualityGrade.S;
+    if (accuracy >= 0.75) return QualityGrade.A;
+    if (accuracy >= 0.60) return QualityGrade.B;
+    if (accuracy >= 0.45) return QualityGrade.C;
+    if (accuracy >= 0.30) return QualityGrade.D;
+    return QualityGrade.F;
   }
 
   /// 결과물을 재료로 전환 (연쇄 조합)
   void useResultAsIngredient() {
     if (_lastResult == null) return;
-    final recipe = engine.allRecipes.firstWhere((r) => r.id == _lastResult!.recipeId);
+
     _intermediateResults.add(_lastResult!);
     _selectedIngredients.clear();
-    _selectedIngredients.add(recipe.outputIngredientId);
+
+    if (!_isProcedural) {
+      // 정적 레시피: outputIngredientId 사용
+      final recipe = engine.allRecipes.firstWhere(
+        (r) => r.id == _lastResult!.recipeId,
+        orElse: () => engine.allRecipes.first,
+      );
+      _selectedIngredients.add(recipe.outputIngredientId);
+    } else {
+      // 절차적: 원래 재료 중 첫 번째 유지 (결과물을 재료로 재사용은 정적만)
+      // 절차적 결과는 "가공된" 상태로 중간 결과에만 반영
+    }
+
     _resetTools();
     _lastResult = null;
+    _isProcedural = false;
     notifyListeners();
   }
 
   /// 심사 요청
   JudgingResult? requestJudging() {
     if (_lastResult == null) return null;
-    final recipe = engine.allRecipes.firstWhere((r) => r.id == _lastResult!.recipeId);
-    _lastJudging = JudgingEngine.judge(_lastResult!, recipe);
+
+    if (_isProcedural) {
+      // 절차적 레시피용 심사: 임시 Recipe 객체 생성
+      final tempRecipe = Recipe(
+        id: _lastResult!.recipeId,
+        name: _lastResult!.recipeName,
+        inputs: const [],
+        outputIngredientId: '',
+        category: '절차적',
+      );
+      _lastJudging = JudgingEngine.judge(_lastResult!, tempRecipe);
+    } else {
+      final recipe = engine.allRecipes.firstWhere(
+        (r) => r.id == _lastResult!.recipeId,
+        orElse: () => engine.allRecipes.first,
+      );
+      _lastJudging = JudgingEngine.judge(_lastResult!, recipe);
+    }
 
     // 리더보드에 자동 등록
     leaderboard.addEntry(
@@ -168,6 +270,7 @@ class GameState extends ChangeNotifier {
     _intermediateResults.clear();
     _lastResult = null;
     _lastJudging = null;
+    _isProcedural = false;
     _resetTools();
     notifyListeners();
   }
