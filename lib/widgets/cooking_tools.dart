@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/models.dart';
 import '../services/game_state.dart';
 
-/// 조리 도구 패널 — 칼, 물, 불 조작 + 조리하기 버튼
+/// 조리 도구 패널 — 칼, 물, 불 조작 + 조리하기 버튼 + 힌트
 class CookingTools extends StatefulWidget {
   final int knifeCount;
   final double waterAmount;
@@ -14,7 +15,8 @@ class CookingTools extends StatefulWidget {
   final Function(int) onFireChange;
   final Function(GameState) onStartCooking;
   final VoidCallback onStopCooking;
-  final VoidCallback? onCook; // 조리하기 버튼
+  final VoidCallback? onCook;
+  final Recipe? matchedRecipe; // 현재 매칭된 레시피 (힌트용)
 
   const CookingTools({
     super.key,
@@ -29,6 +31,7 @@ class CookingTools extends StatefulWidget {
     required this.onStartCooking,
     required this.onStopCooking,
     this.onCook,
+    this.matchedRecipe,
   });
 
   @override
@@ -45,13 +48,10 @@ class _CookingToolsState extends State<CookingTools> {
         children: [
           Row(
             children: [
-              // 칼
               Expanded(child: _buildKnifeTool()),
               const SizedBox(width: 8),
-              // 물
               Expanded(child: _buildWaterTool()),
               const SizedBox(width: 8),
-              // 불
               Expanded(child: _buildFireTool()),
             ],
           ),
@@ -84,7 +84,27 @@ class _CookingToolsState extends State<CookingTools> {
     );
   }
 
+  /// 힌트 텍스트 생성
+  String? _knifeHint() {
+    final r = widget.matchedRecipe;
+    if (r == null || r.knife == null) return null;
+    return '권장 ${r.knife!.min}~${r.knife!.max}회';
+  }
+
+  String? _waterHint() {
+    final r = widget.matchedRecipe;
+    if (r == null || r.water == null) return null;
+    return '권장 ${r.water!.min}~${r.water!.max}';
+  }
+
+  String? _fireHint() {
+    final r = widget.matchedRecipe;
+    if (r == null || r.fire == null) return null;
+    return '권장 ${r.fire!.min}~${r.fire!.max}';
+  }
+
   Widget _buildKnifeTool() {
+    final hint = _knifeHint();
     return Column(
       children: [
         const Text('🔪 칼', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -108,17 +128,24 @@ class _CookingToolsState extends State<CookingTools> {
           ),
         ),
         const SizedBox(height: 2),
-        const Text('터치해서 칼질', style: TextStyle(fontSize: 10, color: Colors.grey)),
+        Text(
+          hint ?? '터치해서 칼질',
+          style: TextStyle(
+            fontSize: 10,
+            color: hint != null ? Colors.blue.shade700 : Colors.grey,
+            fontWeight: hint != null ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
       ],
     );
   }
 
   Widget _buildWaterTool() {
+    final hint = _waterHint();
     return Column(
       children: [
         const Text('💧 물', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         const SizedBox(height: 4),
-        // 슬라이더 + 버튼으로 물 조절
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -183,11 +210,14 @@ class _CookingToolsState extends State<CookingTools> {
             ),
           ),
         ),
+        if (hint != null)
+          Text(hint, style: TextStyle(fontSize: 10, color: Colors.blue.shade700, fontWeight: FontWeight.bold)),
       ],
     );
   }
 
   Widget _buildFireTool() {
+    final hint = _fireHint();
     return Column(
       children: [
         const Text('🔥 불', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
@@ -227,9 +257,18 @@ class _CookingToolsState extends State<CookingTools> {
         ),
         const SizedBox(height: 2),
         Text(
-          '단계 ${widget.fireLevel}',
-          style: const TextStyle(fontSize: 10, color: Colors.grey),
+          hint ?? '단계 ${widget.fireLevel}',
+          style: TextStyle(
+            fontSize: 10,
+            color: hint != null ? Colors.blue.shade700 : Colors.grey,
+            fontWeight: hint != null ? FontWeight.bold : FontWeight.normal,
+          ),
         ),
+        if (hint != null)
+          Text(
+            '불 x 시간 = ${(widget.fireLevel * widget.cookingTime).round()}',
+            style: const TextStyle(fontSize: 9, color: Colors.grey),
+          ),
       ],
     );
   }

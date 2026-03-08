@@ -89,6 +89,7 @@ class _CookingScreenState extends State<CookingScreen> {
               onStartCooking: _startCooking,
               onStopCooking: _stopCooking,
               onCook: hasIngredients && !hasResult ? () => _tryCook(state) : null,
+              matchedRecipe: hasIngredients ? state.findMatchingRecipe() : null,
             ),
 
             const Divider(height: 1),
