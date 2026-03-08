@@ -420,7 +420,7 @@ class ProceduralRecipeEngine {
   }
 
   static double randomBonus(int hash) {
-    final r = Random(hash + DateTime.now().millisecondsSinceEpoch ~/ 10000);
+    final r = Random(hash + DateTime.now().millisecondsSinceEpoch ~/ 1000);
     return 0.9 + r.nextDouble() * 0.2;
   }
 }

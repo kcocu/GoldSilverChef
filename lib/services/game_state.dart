@@ -96,6 +96,12 @@ class GameState extends ChangeNotifier {
 
   /// 조리 완료 → 정적 레시피 우선, 없으면 절차적 생성
   CookingResult cook() {
+    // 이전 결과가 있는데 useResultAsIngredient()를 거치지 않은 경우
+    // → 새로운 독립 조리이므로 중간 결과 초기화
+    if (_lastResult != null) {
+      _intermediateResults.clear();
+    }
+
     final recipe = findMatchingRecipe();
     final fireValue = (_fireLevel * _cookingTime).round();
 
@@ -226,11 +232,13 @@ class GameState extends ChangeNotifier {
 
     if (!_isProcedural) {
       // 정적 레시피: outputIngredientId 사용
-      final recipe = engine.allRecipes.firstWhere(
-        (r) => r.id == _lastResult!.recipeId,
-        orElse: () => engine.allRecipes.first,
+      final recipe = engine.allRecipes.cast<Recipe?>().firstWhere(
+        (r) => r!.id == _lastResult!.recipeId,
+        orElse: () => null,
       );
-      _selectedIngredients.add(recipe.outputIngredientId);
+      if (recipe != null) {
+        _selectedIngredients.add(recipe.outputIngredientId);
+      }
     } else {
       // 절차적: 원래 재료 중 첫 번째 유지 (결과물을 재료로 재사용은 정적만)
       // 절차적 결과는 "가공된" 상태로 중간 결과에만 반영
@@ -256,10 +264,11 @@ class GameState extends ChangeNotifier {
       );
       _lastJudging = JudgingEngine.judge(_lastResult!, tempRecipe);
     } else {
-      final recipe = engine.allRecipes.firstWhere(
-        (r) => r.id == _lastResult!.recipeId,
-        orElse: () => engine.allRecipes.first,
+      final recipe = engine.allRecipes.cast<Recipe?>().firstWhere(
+        (r) => r!.id == _lastResult!.recipeId,
+        orElse: () => null,
       );
+      if (recipe == null) return null;
       _lastJudging = JudgingEngine.judge(_lastResult!, recipe);
     }
 

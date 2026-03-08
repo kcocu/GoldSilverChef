@@ -1,10 +1,7 @@
-import 'dart:math';
 import '../models/models.dart';
 
 /// 심사 엔진
 class JudgingEngine {
-  static final _random = Random();
-
   /// 심사 실행
   static JudgingResult judge(CookingResult result, Recipe recipe) {
     final scores = Judge.all.map((judge) => _scoreForJudge(judge, result, recipe)).toList();

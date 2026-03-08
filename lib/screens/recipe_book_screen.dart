@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/models.dart';
 import '../services/game_state.dart';
 
 class RecipeBookScreen extends StatefulWidget {
@@ -208,7 +209,7 @@ class _RecipeBookScreenState extends State<RecipeBookScreen> with SingleTickerPr
             leading: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: _customGradeColor(grade),
+                color: QualityGrade.colorFromLabel(grade),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(grade, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -258,16 +259,4 @@ class _RecipeBookScreenState extends State<RecipeBookScreen> with SingleTickerPr
     );
   }
 
-  Color _customGradeColor(String grade) {
-    switch (grade) {
-      case 'SS+': return const Color(0xFFFFD700);
-      case 'SS': return Colors.red;
-      case 'S': return Colors.orange;
-      case 'A': return Colors.purple;
-      case 'B': return Colors.blue;
-      case 'C': return Colors.green;
-      case 'D': return Colors.brown;
-      default: return Colors.grey;
-    }
-  }
 }

@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 /// 품질 등급
 enum QualityGrade {
   F, D, C, B, A, S, SS, SSPlus;
@@ -26,6 +28,28 @@ enum QualityGrade {
       case QualityGrade.SS: return 21;
       case QualityGrade.SSPlus: return 34;
     }
+  }
+
+  /// 등급별 대표 색상
+  Color get color {
+    switch (this) {
+      case QualityGrade.F: return const Color(0xFF9E9E9E);     // grey
+      case QualityGrade.D: return const Color(0xFF795548);     // brown
+      case QualityGrade.C: return const Color(0xFF4CAF50);     // green
+      case QualityGrade.B: return const Color(0xFF2196F3);     // blue
+      case QualityGrade.A: return const Color(0xFF9C27B0);     // purple
+      case QualityGrade.S: return const Color(0xFFFF9800);     // orange
+      case QualityGrade.SS: return const Color(0xFFF44336);    // red
+      case QualityGrade.SSPlus: return const Color(0xFFFFD700); // gold
+    }
+  }
+
+  /// 문자열 라벨로부터 등급 변환 (커스텀 레시피 표시용)
+  static Color colorFromLabel(String label) {
+    for (final grade in QualityGrade.values) {
+      if (grade.label == label) return grade.color;
+    }
+    return const Color(0xFF9E9E9E);
   }
 }
 

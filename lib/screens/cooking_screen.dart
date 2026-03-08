@@ -282,12 +282,14 @@ class _CookingScreenState extends State<CookingScreen> {
 
   void _tryCook(GameState state) {
     _stopCooking();
+    // cook() 내부에서 discover()를 호출하므로, 호출 전에 기존 발견 여부를 캡처
+    final knownBefore = state.recipeBook.discovered.toSet();
     final result = state.cook();
     final isFailed = result.recipeId == 'failed';
     if (!isFailed) {
       _audio.playBell();
       _audio.playCookware();
-      final isNew = state.recipeBook.isDiscovered(result.recipeId);
+      final isNew = !knownBefore.contains(result.recipeId);
       if (isNew) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -303,8 +305,10 @@ class _CookingScreenState extends State<CookingScreen> {
     state.requestJudging();
     if (state.lastJudging != null) {
       final judging = state.lastJudging!;
+      final isStoryMode = widget.requiredTheme != null;
       // 심사 화면으로 이동 전 조리대 초기화 (새 요리 준비)
       state.resetAfterJudging();
+      if (!mounted) return;
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -312,7 +316,7 @@ class _CookingScreenState extends State<CookingScreen> {
         ),
       );
       // 스토리 모드에서 온 경우, 심사 결과를 반환
-      if (context.mounted && widget.requiredTheme != null) {
+      if (mounted && isStoryMode) {
         Navigator.pop(context, judging);
       }
     }

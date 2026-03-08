@@ -43,6 +43,8 @@ class CookingResult {
     'waterAccuracy': waterAccuracy,
     'fireAccuracy': fireAccuracy,
     'overallAccuracy': overallAccuracy,
+    'comment': comment,
+    'intermediateResults': intermediateResults.map((r) => r.toJson()).toList(),
     'cookedAt': cookedAt.toIso8601String(),
   };
 }

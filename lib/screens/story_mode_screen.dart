@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../models/models.dart';
 import '../services/game_state.dart';
 import 'cooking_screen.dart';
-import 'judging_screen.dart';
 
 class StoryModeScreen extends StatefulWidget {
   const StoryModeScreen({super.key});
@@ -27,6 +26,12 @@ class _StoryModeScreenState extends State<StoryModeScreen> {
     super.initState();
     _generateNpcs();
     _generateTheme();
+  }
+
+  @override
+  void dispose() {
+    _npcs.clear();
+    super.dispose();
   }
 
   void _generateNpcs() {

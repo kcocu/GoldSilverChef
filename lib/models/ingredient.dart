@@ -61,15 +61,23 @@ class Ingredient {
     'tier': tier,
   };
 
-  factory Ingredient.fromJson(Map<String, dynamic> json) => Ingredient(
-    id: json['id'],
-    name: json['name'],
-    type: IngredientType.values.byName(json['type']),
-    icon: json['icon'] ?? '🧂',
-    isBase: json['isBase'] ?? false,
-    description: json['description'],
-    tier: json['tier'] ?? 0,
-  );
+  factory Ingredient.fromJson(Map<String, dynamic> json) {
+    IngredientType type;
+    try {
+      type = IngredientType.values.byName(json['type']);
+    } catch (_) {
+      type = IngredientType.derived;
+    }
+    return Ingredient(
+      id: json['id'],
+      name: json['name'],
+      type: type,
+      icon: json['icon'] ?? '🧂',
+      isBase: json['isBase'] ?? false,
+      description: json['description'],
+      tier: json['tier'] ?? 0,
+    );
+  }
 
   @override
   bool operator ==(Object other) => other is Ingredient && other.id == id;

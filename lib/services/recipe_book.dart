@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 레시피북 — 발견한 레시피 자동 기록 + 즐겨찾기 + 커스텀 레시피 저장
@@ -85,9 +86,13 @@ class RecipeBook {
   }
 
   Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_discoveredKey, json.encode(_discovered.toList()));
-    await prefs.setString(_favoritesKey, json.encode(_favorites.toList()));
-    await prefs.setString(_customRecipesKey, json.encode(_customRecipes));
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_discoveredKey, json.encode(_discovered.toList()));
+      await prefs.setString(_favoritesKey, json.encode(_favorites.toList()));
+      await prefs.setString(_customRecipesKey, json.encode(_customRecipes));
+    } catch (e) {
+      debugPrint('RecipeBook 저장 실패: $e');
+    }
   }
 }

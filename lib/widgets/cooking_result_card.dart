@@ -26,11 +26,11 @@ class CookingResultCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               decoration: BoxDecoration(
-                color: _gradeColor(result.grade),
+                color: result.grade.color,
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: _gradeColor(result.grade).withValues(alpha: 0.4),
+                    color: result.grade.color.withValues(alpha: 0.4),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -126,16 +126,4 @@ class CookingResultCard extends StatelessWidget {
     );
   }
 
-  Color _gradeColor(QualityGrade grade) {
-    switch (grade) {
-      case QualityGrade.F: return Colors.grey;
-      case QualityGrade.D: return Colors.brown;
-      case QualityGrade.C: return Colors.green;
-      case QualityGrade.B: return Colors.blue;
-      case QualityGrade.A: return Colors.purple;
-      case QualityGrade.S: return Colors.orange;
-      case QualityGrade.SS: return Colors.red;
-      case QualityGrade.SSPlus: return const Color(0xFFFFD700);
-    }
-  }
 }

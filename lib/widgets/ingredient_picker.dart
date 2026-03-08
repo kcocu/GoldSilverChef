@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/models.dart';
@@ -38,6 +39,9 @@ class _IngredientPickerState extends State<IngredientPicker> {
 
   // 호버(클릭) 상태
   String? _hoveredIngredientId;
+
+  // 검색 디바운스
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -85,6 +89,12 @@ class _IngredientPickerState extends State<IngredientPicker> {
     _unlockedCache = null;
     _relatedLockedCache = null;
     _filteredCache = null;
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    super.dispose();
   }
 
   @override
@@ -224,10 +234,17 @@ class _IngredientPickerState extends State<IngredientPicker> {
                     isDense: true,
                     contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                   ),
-                  onChanged: (v) => setState(() {
-                    _search = v;
-                    _filteredCache = null;
-                  }),
+                  onChanged: (v) {
+                    _searchDebounce?.cancel();
+                    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+                      if (mounted) {
+                        setState(() {
+                          _search = v;
+                          _filteredCache = null;
+                        });
+                      }
+                    });
+                  },
                 ),
               ),
               const SizedBox(width: 8),
@@ -321,7 +338,7 @@ class _IngredientPickerState extends State<IngredientPicker> {
             leading: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: _gradeColor(grade),
+                color: QualityGrade.colorFromLabel(grade),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(grade, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
@@ -342,19 +359,6 @@ class _IngredientPickerState extends State<IngredientPicker> {
         );
       },
     );
-  }
-
-  Color _gradeColor(String grade) {
-    switch (grade) {
-      case 'SS+': return const Color(0xFFFFD700);
-      case 'SS': return Colors.red;
-      case 'S': return Colors.orange;
-      case 'A': return Colors.purple;
-      case 'B': return Colors.blue;
-      case 'C': return Colors.green;
-      case 'D': return Colors.brown;
-      default: return Colors.grey;
-    }
   }
 
   Widget _buildHoverHeader(Ingredient ing) {
