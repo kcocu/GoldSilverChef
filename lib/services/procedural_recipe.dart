@@ -2,15 +2,9 @@ import 'dart:math';
 import '../models/models.dart';
 
 /// 절차적 레시피 생성 엔진
-/// 어떤 재료 조합이든 레시피를 생성하며, 조합의 합리성에 따라 점수 보정
 class ProceduralRecipeEngine {
-  static final _random = Random();
-
   // ─── 카테고리 궁합 ───
-
-  /// 재료 타입 간 궁합 점수 (0.0 ~ 1.0)
-  /// 높을수록 자연스러운 조합
-  static const _compatibilityMatrix = <String, Map<String, double>>{
+  static const _compat = <String, Map<String, double>>{
     'meat': {'vegetable': 0.9, 'seasoning': 0.9, 'oil': 0.9, 'salt': 0.8, 'mushroom': 0.8, 'egg': 0.7, 'grain': 0.7, 'dairy': 0.6, 'liquid': 0.7, 'sugar': 0.2, 'fruit': 0.3, 'seafood': 0.3},
     'seafood': {'vegetable': 0.8, 'seasoning': 0.9, 'salt': 0.9, 'liquid': 0.8, 'oil': 0.7, 'mushroom': 0.7, 'grain': 0.6, 'egg': 0.6, 'dairy': 0.3, 'sugar': 0.2, 'fruit': 0.3, 'meat': 0.3},
     'vegetable': {'meat': 0.9, 'seasoning': 0.9, 'oil': 0.8, 'salt': 0.8, 'mushroom': 0.8, 'grain': 0.7, 'seafood': 0.8, 'egg': 0.7, 'dairy': 0.6, 'liquid': 0.7, 'sugar': 0.3, 'fruit': 0.5},
@@ -27,10 +21,9 @@ class ProceduralRecipeEngine {
   };
 
   // ─── 조리법 이름 ───
-
-  static const _cookMethodByTools = <String, List<String>>{
+  static const _cookMethods = <String, List<String>>{
     'none': ['혼합', '섞음', '무침', '절임'],
-    'knife': ['회', '다짐', '채썰기', '슬라이스'],
+    'knife': ['회', '다짐', '채썰기', '슬라이스', '타르타르'],
     'water': ['수프', '삶음', '우려냄', '냉국'],
     'fire': ['구이', '볶음', '로스트', '훈제'],
     'knife_water': ['전골', '칼국수', '샤브샤브', '육수'],
@@ -39,35 +32,108 @@ class ProceduralRecipeEngine {
     'knife_water_fire': ['전골', '해물탕', '카레', '스튜'],
   };
 
-  // ─── 이상한 조합 접두어 ───
+  static const _weirdPrefixes = ['수상한', '기묘한', '도전적인', '실험적', '파격적', '대담한', '황당한', '충격적', '괴상한', '모험적'];
+  static const _normalPrefixes = ['정성스런', '특제', '오늘의', '집', '엄마의', '셰프의', '비밀', '전통', '수제', '프리미엄'];
+  static const _goodPrefixes = ['완벽한', '황금', '명품', '전설의', '비전', '극상', '일품', '최고급', '환상의', '마스터'];
 
-  static const _weirdPrefixes = [
-    '수상한', '기묘한', '도전적인', '실험적', '파격적',
-    '대담한', '황당한', '충격적', '괴상한', '모험적',
+  // ─── 비밀 레시피 (검색 불가) ───
+  static final _secretRecipes = <_SecretRecipe>[
+    // 소금 폭탄
+    _SecretRecipe(
+      check: (ids) => ids.where((id) => id == 'salt').length >= 5,
+      name: '소금 폭탄',
+      sanity: 0.1,
+      comment: '소금만 잔뜩... 혈압이 위험합니다!',
+      category: '실험 요리',
+    ),
+    // 바닷물 요리 (소금 다수 + 물 소량)
+    _SecretRecipe(
+      check: (ids) {
+        final saltCount = ids.where((id) => id == 'salt').length;
+        final hasLiquid = ids.contains('liquid');
+        return saltCount >= 3 && hasLiquid;
+      },
+      name: '인공 바닷물 요리',
+      sanity: 0.15,
+      comment: '바다의 맛을 재현했습니다... 아마도.',
+      category: '실험 요리',
+    ),
+    // 설탕 지옥
+    _SecretRecipe(
+      check: (ids) => ids.where((id) => id == 'sugar').length >= 5,
+      name: '설탕 지옥 디저트',
+      sanity: 0.1,
+      comment: '치과 의사가 울고 갑니다.',
+      category: '실험 요리',
+    ),
+    // 무지개 가루
+    _SecretRecipe(
+      check: (ids) {
+        final powders = ['red_powder', 'blue_powder', 'green_powder', 'purple_powder', 'yellow_powder'];
+        return powders.every((p) => ids.contains(p));
+      },
+      name: '무지개 환상 요리',
+      sanity: 0.5,
+      comment: '오색 가루의 조화! 눈이 부십니다!',
+      category: '스페셜',
+    ),
+    // 구슬 전부
+    _SecretRecipe(
+      check: (ids) {
+        final orbs = ['fresh_orb', 'lively_orb', 'fly_orb', 'flow_orb'];
+        return orbs.every((o) => ids.contains(o));
+      },
+      name: '사원소 융합 요리',
+      sanity: 0.6,
+      comment: '신선, 활발, 비행, 흐름의 기운이 하나로!',
+      category: '스페셜',
+    ),
+    // 모래시계 + 정체모를 가루
+    _SecretRecipe(
+      check: (ids) => ids.contains('hourglass') && ids.contains('mystery_powder') && ids.length == 2,
+      name: '시간의 미스터리',
+      sanity: 0.3,
+      comment: '시간과 미지의 만남... 무슨 맛일까?',
+      category: '스페셜',
+    ),
+    // 모든 기본 재료
+    _SecretRecipe(
+      check: (ids) {
+        final bases = ['grain', 'meat', 'seafood', 'egg', 'dairy', 'vegetable', 'fruit', 'mushroom', 'oil', 'liquid', 'sugar', 'salt', 'seasoning'];
+        return bases.every((b) => ids.contains(b));
+      },
+      name: '만물상 카오스 요리',
+      sanity: 0.05,
+      comment: '세상 모든 재료를 한 솥에! 용기에 박수를!',
+      category: '스페셜',
+    ),
+    // 고기 x 5 이상
+    _SecretRecipe(
+      check: (ids) => ids.where((id) => id == 'meat').length >= 5,
+      name: '육식공룡의 만찬',
+      sanity: 0.2,
+      comment: '고기만 잔뜩... 채소도 좀 드세요.',
+      category: '실험 요리',
+    ),
+    // 기름 x 3 이상
+    _SecretRecipe(
+      check: (ids) => ids.where((id) => id == 'oil').length >= 3,
+      name: '기름의 바다',
+      sanity: 0.1,
+      comment: '건강검진이 필요합니다.',
+      category: '실험 요리',
+    ),
+    // 용암 요리 (불 수치 극대)
+    _SecretRecipe(
+      check: (ids) => false, // fireValue 체크는 generate에서 별도 처리
+      name: '용암 요리',
+      sanity: 0.05,
+      comment: '모든 것이 타버렸습니다... 재만 남았네요.',
+      category: '실험 요리',
+    ),
   ];
-
-  static const _normalPrefixes = [
-    '정성스런', '특제', '오늘의', '집', '엄마의',
-    '셰프의', '비밀', '전통', '수제', '프리미엄',
-  ];
-
-  static const _goodPrefixes = [
-    '완벽한', '황금', '명품', '전설의', '비전',
-    '극상', '일품', '최고급', '환상의', '마스터',
-  ];
-
-  // ─── 재료 타입별 한글 이름 ───
-
-  static const _categoryKorean = <String, String>{
-    'meat': '고기', 'seafood': '해물', 'vegetable': '야채',
-    'grain': '곡물', 'dairy': '유제품', 'egg': '알',
-    'fruit': '과일', 'mushroom': '버섯', 'oil': '기름',
-    'liquid': '국물', 'sugar': '달콤', 'salt': '짭짤',
-    'seasoning': '양념', 'derived': '특수',
-  };
 
   /// 절차적 레시피 생성
-  /// [ingredients] 재료 목록, [engine] 재료 정보 조회용
   static ProceduralResult generate({
     required List<Ingredient> ingredients,
     required int knifeValue,
@@ -75,39 +141,146 @@ class ProceduralRecipeEngine {
     required int fireValue,
   }) {
     if (ingredients.isEmpty) {
-      return ProceduralResult(
+      return const ProceduralResult(
         name: '아무것도 아닌 것',
         sanityScore: 0,
         category: '실패',
         toolRanges: {},
+        comment: '재료가 없습니다.',
       );
     }
 
-    // 1. 재료 카테고리 분석
+    final ids = ingredients.map((i) => i.id).toList();
+    final hash = _ingredientHash(ingredients);
     final categories = _analyzeCategories(ingredients);
 
-    // 2. 궁합 점수 계산
+    // ─── 비밀 레시피 체크 ───
+    for (final secret in _secretRecipes) {
+      if (secret.check(ids)) {
+        return ProceduralResult(
+          name: secret.name,
+          sanityScore: secret.sanity,
+          category: secret.category,
+          toolRanges: _generateToolRanges(categories, hash),
+          comment: secret.comment,
+          isSecret: true,
+        );
+      }
+    }
+
+    // ─── 극단적 도구 사용 체크 ───
+    // 불 극대 → 재
+    if (fireValue > 80) {
+      return ProceduralResult(
+        name: '까맣게 탄 ${ingredients.first.name}',
+        sanityScore: 0.05,
+        category: '실험 요리',
+        toolRanges: _generateToolRanges(categories, hash),
+        comment: '불을 너무 오래 써서 재가 되었습니다...',
+        isSecret: true,
+      );
+    }
+
+    // 궁합 + 이름 생성
     final sanity = _calculateSanity(categories);
-
-    // 3. 이름 생성 (해시 기반 결정적 랜덤)
-    final hash = _ingredientHash(ingredients);
-    final name = _generateName(ingredients, categories, sanity, hash, knifeValue, waterValue, fireValue);
-
-    // 4. 도구 범위 생성
-    final toolRanges = _generateToolRanges(categories, hash);
-
-    // 5. 카테고리 결정
+    final toolKey = _getToolKey(knifeValue, waterValue, fireValue);
+    final name = _generateName(ingredients, categories, sanity, hash, toolKey);
+    final comment = _generateComment(ingredients, knifeValue, waterValue, fireValue, categories);
     final category = _determineCategory(categories, sanity);
 
     return ProceduralResult(
       name: name,
       sanityScore: sanity,
       category: category,
-      toolRanges: toolRanges,
+      toolRanges: _generateToolRanges(categories, hash),
+      comment: comment,
     );
   }
 
-  /// 재료들의 카테고리 비율 분석
+  // ─── 도구 사용 코멘트 생성 ───
+  static String _generateComment(
+    List<Ingredient> ingredients,
+    int knifeValue,
+    int waterValue,
+    int fireValue,
+    Map<String, int> categories,
+  ) {
+    final comments = <String>[];
+    final mainCat = _getBaseCategory(ingredients.first);
+
+    // 칼질 코멘트
+    if (knifeValue > 0) {
+      if (knifeValue <= 3) {
+        comments.add('가볍게 칼질했습니다.');
+      } else if (knifeValue <= 10) {
+        comments.add('정성스럽게 썰었습니다.');
+      } else if (knifeValue <= 20) {
+        comments.add('잘게 다졌습니다.');
+      } else if (knifeValue <= 40) {
+        comments.add('아주 곱게 채썰기했습니다.');
+      } else {
+        comments.add('미친듯이 칼질! 거의 가루가 되었습니다.');
+      }
+    }
+
+    // 물 코멘트
+    if (waterValue > 0) {
+      if (waterValue <= 10) {
+        comments.add('살짝 물을 뿌렸습니다.');
+      } else if (waterValue <= 30) {
+        comments.add('적당한 물로 촉촉하게.');
+      } else if (waterValue <= 60) {
+        comments.add('물이 넉넉합니다. 국물 요리!');
+      } else {
+        comments.add('물이 넘칩니다! 거의 수영장...');
+      }
+    }
+
+    // 불 코멘트 (고기일 때 특별)
+    if (fireValue > 0) {
+      if (mainCat == 'meat' || mainCat == 'seafood') {
+        if (fireValue <= 5) {
+          comments.add('레어! 속이 빨간 상태.');
+        } else if (fireValue <= 12) {
+          comments.add('미디엄 레어. 완벽한 핑크빛.');
+        } else if (fireValue <= 20) {
+          comments.add('미디엄. 적당히 익었습니다.');
+        } else if (fireValue <= 35) {
+          comments.add('미디엄 웰. 거의 다 익었네요.');
+        } else if (fireValue <= 50) {
+          comments.add('웰던! 바삭하게 잘 구워졌습니다.');
+        } else {
+          comments.add('과하게 구웠습니다! 약간 탄 냄새...');
+        }
+      } else if (mainCat == 'vegetable' || mainCat == 'mushroom') {
+        if (fireValue <= 8) {
+          comments.add('살짝 볶아 아삭합니다.');
+        } else if (fireValue <= 20) {
+          comments.add('적당히 볶아 부드럽습니다.');
+        } else if (fireValue <= 40) {
+          comments.add('오래 볶아 깊은 맛이 납니다.');
+        } else {
+          comments.add('너무 오래 볶아 쭈글쭈글...');
+        }
+      } else {
+        if (fireValue <= 10) {
+          comments.add('약불로 천천히.');
+        } else if (fireValue <= 30) {
+          comments.add('중불로 적당히.');
+        } else {
+          comments.add('강불로 빠르게!');
+        }
+      }
+    }
+
+    // 도구 미사용
+    if (knifeValue == 0 && waterValue == 0 && fireValue == 0) {
+      comments.add('도구를 사용하지 않았습니다. 날것 그대로!');
+    }
+
+    return comments.join(' ');
+  }
+
   static Map<String, int> _analyzeCategories(List<Ingredient> ingredients) {
     final counts = <String, int>{};
     for (final ing in ingredients) {
@@ -117,7 +290,6 @@ class ProceduralRecipeEngine {
     return counts;
   }
 
-  /// 재료의 기본 카테고리 (추상 재료는 무시)
   static String _getBaseCategory(Ingredient ing) {
     switch (ing.type) {
       case IngredientType.meat: return 'meat';
@@ -137,36 +309,26 @@ class ProceduralRecipeEngine {
     }
   }
 
-  /// 궁합 점수 계산 (0.0 ~ 1.0)
   static double _calculateSanity(Map<String, int> categories) {
     final cats = categories.keys.where((c) => c != 'derived').toList();
-    if (cats.length <= 1) return 0.8; // 단일 카테고리 = 무난
+    if (cats.length <= 1) return 0.8;
 
     double totalCompat = 0;
     int pairCount = 0;
     for (int i = 0; i < cats.length; i++) {
       for (int j = i + 1; j < cats.length; j++) {
-        final compat = _getCompatibility(cats[i], cats[j]);
-        totalCompat += compat;
+        totalCompat += _compat[cats[i]]?[cats[j]] ?? _compat[cats[j]]?[cats[i]] ?? 0.4;
         pairCount++;
       }
     }
 
     if (pairCount == 0) return 0.5;
     final avgCompat = totalCompat / pairCount;
-
-    // 재료 수가 많을수록 약간 감점 (복잡도)
-    final totalIngredients = categories.values.fold(0, (a, b) => a + b);
-    final complexityPenalty = (totalIngredients > 5) ? (totalIngredients - 5) * 0.03 : 0.0;
-
-    return (avgCompat - complexityPenalty).clamp(0.0, 1.0);
+    final totalIng = categories.values.fold(0, (a, b) => a + b);
+    final penalty = (totalIng > 5) ? (totalIng - 5) * 0.03 : 0.0;
+    return (avgCompat - penalty).clamp(0.0, 1.0);
   }
 
-  static double _getCompatibility(String a, String b) {
-    return _compatibilityMatrix[a]?[b] ?? _compatibilityMatrix[b]?[a] ?? 0.4;
-  }
-
-  /// 결정적 해시 (같은 재료 → 같은 결과)
   static int _ingredientHash(List<Ingredient> ingredients) {
     final ids = ingredients.map((i) => i.id).toList()..sort();
     int hash = 0;
@@ -178,53 +340,6 @@ class ProceduralRecipeEngine {
     return hash;
   }
 
-  /// 레시피 이름 생성
-  static String _generateName(
-    List<Ingredient> ingredients,
-    Map<String, int> categories,
-    double sanity,
-    int hash,
-    int knifeValue,
-    int waterValue,
-    int fireValue,
-  ) {
-    // 주재료 (가장 많은 카테고리 또는 첫 번째)
-    final mainIng = ingredients.first;
-    final mainName = mainIng.name;
-
-    // 조리법 결정
-    final toolKey = _getToolKey(knifeValue, waterValue, fireValue);
-    final methods = _cookMethodByTools[toolKey] ?? _cookMethodByTools['none']!;
-    final method = methods[hash % methods.length];
-
-    // 접두어 (궁합에 따라)
-    String prefix;
-    if (sanity >= 0.7) {
-      // 랜덤 좋은/보통 접두어
-      final prefixes = (hash % 3 == 0) ? _goodPrefixes : _normalPrefixes;
-      prefix = prefixes[hash % prefixes.length];
-    } else if (sanity >= 0.4) {
-      // 보통 ~ 약간 이상
-      final all = [..._normalPrefixes, ..._weirdPrefixes.sublist(0, 3)];
-      prefix = all[hash % all.length];
-    } else {
-      // 뇌절
-      prefix = _weirdPrefixes[hash % _weirdPrefixes.length];
-    }
-
-    // 부재료 이름 (2번째 재료)
-    String subName = '';
-    if (ingredients.length >= 2) {
-      final sub = ingredients[1];
-      subName = ' ${sub.name}';
-    }
-
-    // 재료 3개 이상이면 "외 N종"
-    final extra = ingredients.length > 2 ? ' 외${ingredients.length - 2}종' : '';
-
-    return '$prefix $mainName$subName $method$extra';
-  }
-
   static String _getToolKey(int knife, int water, int fire) {
     final parts = <String>[];
     if (knife > 0) parts.add('knife');
@@ -233,95 +348,106 @@ class ProceduralRecipeEngine {
     return parts.isEmpty ? 'none' : parts.join('_');
   }
 
-  /// 도구 범위 생성 (해시 기반)
+  static String _generateName(
+    List<Ingredient> ingredients,
+    Map<String, int> categories,
+    double sanity,
+    int hash,
+    String toolKey,
+  ) {
+    final mainName = ingredients.first.name;
+    final methods = _cookMethods[toolKey] ?? _cookMethods['none']!;
+    final method = methods[hash % methods.length];
+
+    String prefix;
+    if (sanity >= 0.7) {
+      final prefixes = (hash % 3 == 0) ? _goodPrefixes : _normalPrefixes;
+      prefix = prefixes[hash % prefixes.length];
+    } else if (sanity >= 0.4) {
+      final all = [..._normalPrefixes, ..._weirdPrefixes.sublist(0, 3)];
+      prefix = all[hash % all.length];
+    } else {
+      prefix = _weirdPrefixes[hash % _weirdPrefixes.length];
+    }
+
+    String subName = '';
+    if (ingredients.length >= 2) subName = ' ${ingredients[1].name}';
+    final extra = ingredients.length > 2 ? ' 외${ingredients.length - 2}종' : '';
+
+    return '$prefix $mainName$subName $method$extra';
+  }
+
   static Map<String, ToolRange> _generateToolRanges(Map<String, int> categories, int hash) {
     final ranges = <String, ToolRange>{};
     final r = Random(hash);
-
-    // 칼: 재료 수에 비례
     final total = categories.values.fold(0, (a, b) => a + b);
+
     final knifeOpt = 3 + total * 2 + r.nextInt(10);
-    ranges['knife'] = ToolRange(
-      min: (knifeOpt * 0.5).round(),
-      max: (knifeOpt * 1.8).round(),
-      optimal: knifeOpt,
-    );
+    ranges['knife'] = ToolRange(min: (knifeOpt * 0.5).round(), max: (knifeOpt * 1.8).round(), optimal: knifeOpt);
 
-    // 물: 수프/탕 계열이면 높음
     final hasLiquid = categories.containsKey('liquid');
-    final waterBase = hasLiquid ? 40 : 15;
-    final waterOpt = waterBase + r.nextInt(30);
-    ranges['water'] = ToolRange(
-      min: (waterOpt * 0.4).round(),
-      max: (waterOpt * 1.6).round(),
-      optimal: waterOpt,
-    );
+    final waterOpt = (hasLiquid ? 40 : 15) + r.nextInt(30);
+    ranges['water'] = ToolRange(min: (waterOpt * 0.4).round(), max: (waterOpt * 1.6).round(), optimal: waterOpt);
 
-    // 불: 고기/해물이면 높음
     final hasMeat = categories.containsKey('meat');
     final hasSeafood = categories.containsKey('seafood');
-    final fireBase = (hasMeat || hasSeafood) ? 20 : 8;
-    final fireOpt = fireBase + r.nextInt(20);
-    ranges['fire'] = ToolRange(
-      min: (fireOpt * 0.4).round(),
-      max: (fireOpt * 1.8).round(),
-      optimal: fireOpt,
-    );
+    final fireOpt = ((hasMeat || hasSeafood) ? 20 : 8) + r.nextInt(20);
+    ranges['fire'] = ToolRange(min: (fireOpt * 0.4).round(), max: (fireOpt * 1.8).round(), optimal: fireOpt);
 
     return ranges;
   }
 
-  /// 카테고리 결정
   static String _determineCategory(Map<String, int> categories, double sanity) {
     if (sanity < 0.3) return '실험 요리';
     if (sanity < 0.5) return '퓨전';
-
-    // 주요 카테고리 기반
-    final mainCat = categories.entries
-        .where((e) => e.key != 'derived')
-        .fold<MapEntry<String, int>?>(null, (prev, e) =>
-            prev == null || e.value > prev.value ? e : prev);
-
+    final mainCat = categories.entries.where((e) => e.key != 'derived')
+        .fold<MapEntry<String, int>?>(null, (prev, e) => prev == null || e.value > prev.value ? e : prev);
     if (mainCat == null) return '기타';
-
     switch (mainCat.key) {
       case 'meat': return categories.containsKey('grain') ? '한식' : '양식';
       case 'seafood': return '일식';
       case 'grain': return categories.containsKey('dairy') ? '양식' : '한식';
-      case 'dairy': return categories.containsKey('sugar') ? '디저트' : '양식';
-      case 'fruit': return '디저트';
-      case 'sugar': return '디저트';
+      case 'dairy': case 'fruit': case 'sugar': return '디저트';
       default: return '한식';
     }
   }
 
-  /// 궁합 점수에 따른 품질 보정 계수 (0.3 ~ 1.2)
-  /// 정상 조합은 보너스, 뇌절 조합은 큰 감점
   static double sanityMultiplier(double sanity) {
-    if (sanity >= 0.8) return 1.0 + (sanity - 0.8) * 1.0; // 0.8~1.0 → 1.0~1.2
-    if (sanity >= 0.6) return 0.8 + (sanity - 0.6) * 1.0;  // 0.6~0.8 → 0.8~1.0
-    if (sanity >= 0.4) return 0.5 + (sanity - 0.4) * 1.5;  // 0.4~0.6 → 0.5~0.8
-    return 0.3 + sanity * 0.5; // 0~0.4 → 0.3~0.5
+    if (sanity >= 0.8) return 1.0 + (sanity - 0.8) * 1.0;
+    if (sanity >= 0.6) return 0.8 + (sanity - 0.6) * 1.0;
+    if (sanity >= 0.4) return 0.5 + (sanity - 0.4) * 1.5;
+    return 0.3 + sanity * 0.5;
   }
 
-  /// 랜덤 보정 (±10%)
   static double randomBonus(int hash) {
     final r = Random(hash + DateTime.now().millisecondsSinceEpoch ~/ 10000);
-    return 0.9 + r.nextDouble() * 0.2; // 0.9 ~ 1.1
+    return 0.9 + r.nextDouble() * 0.2;
   }
 }
 
-/// 절차적 생성 결과
+class _SecretRecipe {
+  final bool Function(List<String> ingredientIds) check;
+  final String name;
+  final double sanity;
+  final String comment;
+  final String category;
+  const _SecretRecipe({required this.check, required this.name, required this.sanity, required this.comment, required this.category});
+}
+
 class ProceduralResult {
   final String name;
-  final double sanityScore; // 0.0 ~ 1.0 (궁합 점수)
+  final double sanityScore;
   final String category;
   final Map<String, ToolRange> toolRanges;
+  final String comment;
+  final bool isSecret;
 
   const ProceduralResult({
     required this.name,
     required this.sanityScore,
     required this.category,
     required this.toolRanges,
+    this.comment = '',
+    this.isSecret = false,
   });
 }

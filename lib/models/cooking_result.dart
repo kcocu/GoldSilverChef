@@ -13,6 +13,7 @@ class CookingResult {
   final double fireAccuracy;
   final double overallAccuracy;
   final List<CookingResult> intermediateResults; // 중간 조리 결과들
+  final String comment; // 조리 코멘트 (레어, 웰던 등)
   final DateTime cookedAt;
 
   CookingResult({
@@ -27,6 +28,7 @@ class CookingResult {
     this.fireAccuracy = 1.0,
     this.overallAccuracy = 1.0,
     this.intermediateResults = const [],
+    this.comment = '',
     DateTime? cookedAt,
   }) : cookedAt = cookedAt ?? DateTime.now();
 

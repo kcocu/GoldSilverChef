@@ -176,8 +176,9 @@ class GameState extends ChangeNotifier {
 
     final grade = _accuracyToGrade(overallAcc);
 
+    final procId = 'proc_${hash.abs()}';
     final result = CookingResult(
-      recipeId: 'proc_${hash.abs()}',
+      recipeId: procId,
       recipeName: proc.name,
       grade: grade,
       knifeValue: _knifeCount,
@@ -188,6 +189,16 @@ class GameState extends ChangeNotifier {
       fireAccuracy: fireAcc,
       overallAccuracy: overallAcc,
       intermediateResults: _intermediateResults,
+      comment: proc.comment,
+    );
+
+    // 커스텀 레시피 자동 저장
+    recipeBook.saveCustomRecipe(
+      id: procId,
+      name: proc.name,
+      ingredientIds: _selectedIngredients.toList(),
+      grade: grade.label,
+      category: proc.category,
     );
 
     _lastResult = result;
@@ -231,12 +242,11 @@ class GameState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 심사 요청
+  /// 심사 요청 → 심사 후 조리대 자동 초기화
   JudgingResult? requestJudging() {
     if (_lastResult == null) return null;
 
     if (_isProcedural) {
-      // 절차적 레시피용 심사: 임시 Recipe 객체 생성
       final tempRecipe = Recipe(
         id: _lastResult!.recipeId,
         name: _lastResult!.recipeName,
@@ -262,6 +272,17 @@ class GameState extends ChangeNotifier {
 
     notifyListeners();
     return _lastJudging;
+  }
+
+  /// 심사 후 조리대 초기화 (새 요리 시작)
+  void resetAfterJudging() {
+    _selectedIngredients.clear();
+    _intermediateResults.clear();
+    _lastResult = null;
+    _isProcedural = false;
+    _resetTools();
+    // _lastJudging은 유지 (심사 결과 화면에서 사용)
+    notifyListeners();
   }
 
   /// 조리대 초기화

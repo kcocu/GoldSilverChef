@@ -302,15 +302,18 @@ class _CookingScreenState extends State<CookingScreen> {
   Future<void> _submitForJudging(GameState state) async {
     state.requestJudging();
     if (state.lastJudging != null) {
+      final judging = state.lastJudging!;
+      // 심사 화면으로 이동 전 조리대 초기화 (새 요리 준비)
+      state.resetAfterJudging();
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => JudgingScreen(result: state.lastJudging!),
+          builder: (_) => JudgingScreen(result: judging),
         ),
       );
       // 스토리 모드에서 온 경우, 심사 결과를 반환
       if (context.mounted && widget.requiredTheme != null) {
-        Navigator.pop(context, state.lastJudging);
+        Navigator.pop(context, judging);
       }
     }
   }

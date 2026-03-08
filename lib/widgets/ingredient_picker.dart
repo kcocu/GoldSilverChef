@@ -236,6 +236,7 @@ class _IngredientPickerState extends State<IngredientPicker> {
                   ButtonSegment(value: -1, label: Text('전체', style: TextStyle(fontSize: 11))),
                   ButtonSegment(value: 0, label: Text('기본', style: TextStyle(fontSize: 11))),
                   ButtonSegment(value: 1, label: Text('파생', style: TextStyle(fontSize: 11))),
+                  ButtonSegment(value: 2, label: Text('레시피', style: TextStyle(fontSize: 11))),
                 ],
                 selected: {_tierFilter},
                 onSelectionChanged: (v) {
@@ -255,7 +256,7 @@ class _IngredientPickerState extends State<IngredientPicker> {
 
         // 해금 현황 or 호버 헤더
         if (isHoverMode && hoveredIng != null)
-          _buildHoverHeader(hoveredIng!)
+          _buildHoverHeader(hoveredIng)
         else
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -265,14 +266,95 @@ class _IngredientPickerState extends State<IngredientPicker> {
             ),
           ),
 
-        // 그리드: 호버 모드면 관련 레시피 결과물, 아니면 일반 재료 목록
+        // 그리드: 레시피 탭, 호버 모드, 일반 재료 목록
         Expanded(
-          child: isHoverMode
-              ? _buildHoverGrid(hoverItems)
-              : _buildNormalGrid(ingredients, unlocked),
+          child: _tierFilter == 2
+              ? _buildCustomRecipeGrid()
+              : isHoverMode
+                  ? _buildHoverGrid(hoverItems)
+                  : _buildNormalGrid(ingredients, unlocked),
         ),
       ],
     );
+  }
+
+  Widget _buildCustomRecipeGrid() {
+    final customs = widget.recipeBook.customRecipes;
+    if (customs.isEmpty) {
+      return const Center(
+        child: Text('저장된 커스텀 레시피가 없습니다.\n요리를 만들면 자동 저장됩니다!',
+            textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+      );
+    }
+
+    final entries = customs.entries.where((e) {
+      if (_search.isEmpty) return true;
+      final name = (e.value['name'] as String?) ?? '';
+      return name.toLowerCase().contains(_search.toLowerCase());
+    }).toList();
+
+    if (entries.isEmpty) {
+      return const Center(
+        child: Text('검색 결과가 없습니다.', style: TextStyle(color: Colors.grey)),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(8),
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        final data = entry.value;
+        final name = (data['name'] as String?) ?? '???';
+        final grade = (data['grade'] as String?) ?? '?';
+        final category = (data['category'] as String?) ?? '';
+        final ingredientIds = (data['ingredients'] as List<dynamic>?)?.cast<String>() ?? [];
+        final ingredientNames = ingredientIds.map((id) {
+          final ing = widget.engine.getIngredient(id);
+          return ing?.name ?? id;
+        }).join(' + ');
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 6),
+          child: ListTile(
+            dense: true,
+            leading: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _gradeColor(grade),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(grade, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+            ),
+            title: Text(name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            subtitle: Text('$category | $ingredientNames', style: const TextStyle(fontSize: 11)),
+            trailing: const Icon(Icons.add_circle_outline, color: Color(0xFF2E7D32)),
+            onTap: () {
+              // 레시피의 재료들을 모두 추가
+              for (final id in ingredientIds) {
+                widget.onSelect(id);
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('$name 재료 ${ingredientIds.length}개 추가'), duration: const Duration(seconds: 1)),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Color _gradeColor(String grade) {
+    switch (grade) {
+      case 'SS+': return const Color(0xFFFFD700);
+      case 'SS': return Colors.red;
+      case 'S': return Colors.orange;
+      case 'A': return Colors.purple;
+      case 'B': return Colors.blue;
+      case 'C': return Colors.green;
+      case 'D': return Colors.brown;
+      default: return Colors.grey;
+    }
   }
 
   Widget _buildHoverHeader(Ingredient ing) {

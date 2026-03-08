@@ -53,6 +53,25 @@ class CookingResultCard extends StatelessWidget {
             const Divider(),
             _buildAccuracyRow('📊 종합', null, result.overallAccuracy),
 
+            // 조리 코멘트
+            if (result.comment.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFFE082)),
+                ),
+                child: Text(
+                  result.comment,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF5D4037)),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+
             if (result.intermediateResults.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
