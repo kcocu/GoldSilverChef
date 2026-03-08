@@ -14,10 +14,10 @@ class IngredientImageMap {
     'fruit': 'fruit/apple.png',
     'mushroom': 'misc/mushroom.png',
     'oil': 'condiment/oil_olive.png',
-    'liquid': 'drink/water.png',
-    'sugar': 'spice/sugar.png',
+    'liquid': 'drink/milk_01.png',
+    'sugar': 'spice/all_spice.png',
     'salt': 'spice/salt.png',
-    'seasoning': 'spice/chili_flakes.png',
+    'seasoning': 'spice/hot_pepper.png',
 
     // 육류 파생
     'beef': 'meat/steak_raw.png',
@@ -36,7 +36,7 @@ class IngredientImageMap {
 
     // 곡물 파생
     'rice': 'grain/rice_bowl.png',
-    'wheat_flour': 'grain/wheat.png',
+    'wheat_flour': 'misc/flour.png',
     'corn': 'grain/corn.png',
     'potato': 'vegetable/potato.png',
     'bean': 'vegetable/bean.png',
@@ -53,7 +53,7 @@ class IngredientImageMap {
     'tomato': 'fruit/tomato.png',
     'pumpkin': 'vegetable/pumpkin.png',
     'cucumber': 'vegetable/cucumber.png',
-    'pepper': 'spice/chili_flakes.png',
+    'pepper': 'spice/hot_pepper.png',
     'ginger': 'vegetable/ginger.png',
 
     // 과일 파생
@@ -73,7 +73,7 @@ class IngredientImageMap {
 
     // 가공
     'cooked_rice': 'grain/rice_steamed.png',
-    'bread': 'grain/wheat.png',
+    'bread': 'misc/fried_bread.png',
     'fried_rice': 'grain/rice_fried.png',
     'steak_sauce': 'condiment/sauce_stock.png',
     'tomato_sauce': 'condiment/sauce_red.png',
@@ -81,26 +81,42 @@ class IngredientImageMap {
     'ketchup': 'condiment/sauce_ketchup.png',
     'mayo': 'condiment/sauce_mild.png',
     'pesto': 'condiment/sauce_secret.png',
+    'tofu': 'misc/tofu_01.png',
+    'noodle': 'pasta/fried_noodles.png',
 
     // 기타
-    'honey': 'treat/honey.png',
-    'chocolate': 'treat/candy_bar.png',
-    'nut': 'seed/acorn.png',
-    'tea_leaf': 'herb/herb_01.png',
-    'herb': 'herb/herb_02.png',
-    'vanilla': 'herb/herb_01.png',
-    'wine': 'drink/wine.png',
+    'honey': 'misc/honey.png',
+    'chocolate': 'treat/carob-ish_treat.png',
+    'nut': 'seed/seeds_pumpkin.png',
+    'tea_leaf': 'herb/gandlevery.png',
+    'herb': 'herb/rookswort.png',
+    'vanilla': 'herb/silvertongue.png',
+    'wine': 'drink/vodka.png',
     'beer': 'drink/beer.png',
     'coffee': 'drink/coffee.png',
 
     // 완성 요리
     'kimchi': 'vegetable/pickle.png',
-    'broth': 'misc/soup.png',
+    'broth': 'misc/stew.png',
 
     // 디저트
-    'jam': 'treat/jam_01.png',
-    'candy': 'treat/candy_01.png',
-    'caramel': 'treat/candy_bar.png',
+    'jam': 'misc/spread_cloudberry_jam.png',
+    'candy': 'treat/birch_candy.png',
+    'caramel': 'treat/carob-ish_treat.png',
+
+    // 추가 완성 요리
+    'pizza': 'misc/pizza_01.png',
+    'burger': 'misc/sandwich_burger_01.png',
+    'salad': 'misc/salad.png',
+    'pancake': 'misc/pancakes.png',
+    'waffle': 'misc/waffle.png',
+    'taco': 'misc/taco.png',
+    'burrito': 'misc/burrito.png',
+    'omelet': 'misc/omelet_01.png',
+    'pasta': 'pasta/spaghetti_01.png',
+    'nachos': 'misc/nachos.png',
+    'stew': 'misc/stew.png',
+    'pie': 'dessert/pie.png',
   };
 
   /// 재료 ID로 이미지 경로 가져오기 (없으면 null)

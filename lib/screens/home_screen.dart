@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audio_service.dart';
 import 'cooking_screen.dart';
 import 'recipe_book_screen.dart';
 import 'story_mode_screen.dart';
+import 'tutorial_screen.dart';
+import 'leaderboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,6 +19,25 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     AudioService.instance.playMenuBgm();
+    _checkFirstRun();
+  }
+
+  Future<void> _checkFirstRun() async {
+    final prefs = await SharedPreferences.getInstance();
+    final seen = prefs.getBool('tutorial_seen') ?? false;
+    if (!seen && mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TutorialScreen(
+            onComplete: () {
+              Navigator.pop(context);
+              prefs.setBool('tutorial_seen', true);
+            },
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -95,6 +117,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => const RecipeBookScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _MenuButton(
+                    icon: Icons.leaderboard,
+                    label: '리더보드',
+                    color: const Color(0xFFFF6F00),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LeaderboardScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _MenuButton(
+                    icon: Icons.help_outline,
+                    label: '게임 방법',
+                    color: const Color(0xFF795548),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TutorialScreen()),
                     ),
                   ),
                   const SizedBox(height: 32),

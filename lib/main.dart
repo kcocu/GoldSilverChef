@@ -53,6 +53,7 @@ class _LoadingWrapperState extends State<_LoadingWrapper> {
       final state = context.read<GameState>();
       await DataLoader.loadAll(state.engine);
       await state.recipeBook.load();
+      await state.leaderboard.load();
       state.markLoaded();
       if (mounted) setState(() => _loading = false);
     } catch (e) {

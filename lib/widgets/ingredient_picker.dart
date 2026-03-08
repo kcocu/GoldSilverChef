@@ -45,7 +45,7 @@ class _IngredientPickerState extends State<IngredientPicker> {
 
     // 필터
     if (_tierFilter >= 0) {
-      ingredients = ingredients.where((i) => i.tier == _tierFilter).toList();
+      ingredients = ingredients.where((i) => i.tier >= _tierFilter).toList();
     }
     if (_search.isNotEmpty) {
       ingredients = ingredients.where((i) => i.name.contains(_search)).toList();

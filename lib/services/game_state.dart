@@ -4,10 +4,12 @@ import 'crafting_engine.dart';
 import 'quality_calculator.dart';
 import 'judging_engine.dart';
 import 'recipe_book.dart';
+import 'leaderboard.dart';
 
 /// 게임 전체 상태 관리
 class GameState extends ChangeNotifier {
   final CraftingEngine engine = CraftingEngine();
+  final Leaderboard leaderboard = Leaderboard();
   final RecipeBook recipeBook = RecipeBook();
 
   bool _isLoaded = false;
@@ -129,6 +131,14 @@ class GameState extends ChangeNotifier {
     if (_lastResult == null) return null;
     final recipe = engine.allRecipes.firstWhere((r) => r.id == _lastResult!.recipeId);
     _lastJudging = JudgingEngine.judge(_lastResult!, recipe);
+
+    // 리더보드에 자동 등록
+    leaderboard.addEntry(
+      dishName: _lastResult!.recipeName,
+      grade: _lastResult!.grade.label,
+      score: _lastJudging!.finalScore,
+    );
+
     notifyListeners();
     return _lastJudging;
   }

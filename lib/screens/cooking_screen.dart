@@ -194,15 +194,19 @@ class _CookingScreenState extends State<CookingScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
                     state.requestJudging();
                     if (state.lastJudging != null) {
-                      Navigator.push(
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (_) => JudgingScreen(result: state.lastJudging!),
                         ),
                       );
+                      // 스토리 모드에서 온 경우, 심사 결과를 반환
+                      if (context.mounted && widget.requiredTheme != null) {
+                        Navigator.pop(context, state.lastJudging);
+                      }
                     }
                   },
                   icon: const Icon(Icons.gavel),
